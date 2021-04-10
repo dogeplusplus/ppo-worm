@@ -1,0 +1,5 @@
+numpy==1.19.5
+mlagents==0.24.1
+mlagents-envs==0.24.1
+gym-unity==0.24.1
+gym==0.18.0
