@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from collections import namedtuple
 
-from environment.env_wrapper import WormGymWrapper
+from ppo_worm.env_wrapper import WormGymWrapper
 
 @pytest.fixture(scope="session")
 def worm_env():

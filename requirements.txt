@@ -3,3 +3,5 @@ mlagents==0.24.1
 mlagents-envs==0.24.1
 gym-unity==0.24.1
 gym==0.18.0
+tqdm==4.60.0
+mpi4py==3.0.3

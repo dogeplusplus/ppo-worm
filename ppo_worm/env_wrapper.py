@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 
-from mlagents_envs.base_env import ActionTuple
+from mlagents_envs.base_env import ActionTuple, ObservationSpec, ActionSpec
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
@@ -14,8 +14,8 @@ class WormGymWrapper(gym.Env):
         
         self.behavior_name = list(self.env.behavior_specs)[0]
         behavior_spec = self.env.behavior_specs[self.behavior_name]
-        self.observation_space = behavior_spec.observation_specs[0]
-        self.action_space = behavior_spec.action_spec
+        self.observation_space = ObservationSpec(640, None, None)
+        self.action_space = ActionSpec(continuous_size=90, discrete_branches=())
 
     def _create_env(self, env_file, time_scale, no_graphics):
         channel = EngineConfigurationChannel()
@@ -36,6 +36,8 @@ class WormGymWrapper(gym.Env):
         return observation
     
     def step(self, action):
+        # Reshape to (10, 9) as needed for the wrapper
+        action = action.reshape((10, 9))
         act = ActionTuple(action)
         self.env.set_actions(self.behavior_name, act)
         
@@ -48,23 +50,15 @@ class WormGymWrapper(gym.Env):
 
     def _decision_to_observation(self, decision_steps):
         steps = len(decision_steps)
-        observations = np.concatenate([decision_steps[i].obs for i in range(steps)], axis=0)
-        rewards = np.stack([decision_steps[i].reward for i in range(steps)])
+        observations = np.concatenate([decision_steps[i].obs for i in range(steps)], axis=1)[0]
+
+        # Take the reward as the mean. #TODO: try to understand this further
+        rewards = np.mean([decision_steps[i].reward for i in range(steps)])
 
         return observations, rewards
 
     def render(self):
-        self.env.render()
+        # self.env.render()
+        pass
     
-        
-def main():
-    env_file = "environments/worm/worm.x86_64"
-    env = WormGymWrapper(env_file)
-    
-    while True:
-        x = np.random.normal(0, 1, size=(10, 9))
-        obs, rew, done, info = env.step(x)
-    
-if __name__ == "__main__":
-    main()
 
