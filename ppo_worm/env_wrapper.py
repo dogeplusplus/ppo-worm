@@ -5,6 +5,8 @@ from mlagents_envs.base_env import ActionTuple, ObservationSpec, ActionSpec
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
+from utils.mpi_tools import proc_id
+
 
 class WormGymWrapper(gym.Env):
     def __init__(self, env_file, time_scale=10., no_graphics=False):
@@ -22,7 +24,9 @@ class WormGymWrapper(gym.Env):
         env = UnityEnvironment(
             file_name=env_file, 
             no_graphics=no_graphics, 
-            side_channels=[channel]
+            side_channels=[channel],
+            # See if setting a worker id allows me to spin up more agents
+            worker_id=proc_id(),
         )
         channel.set_configuration_parameters(
             time_scale=time_scale,

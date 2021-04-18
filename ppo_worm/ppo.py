@@ -5,11 +5,11 @@ import inspect
 import datetime
 import numpy as np
 import torch.nn as nn
+import mlflow.pytorch
 
 from tqdm import tqdm
 from mpi4py import MPI
 from torch.optim import Adam
-from torch.utils.tensorboard import SummaryWriter
 
 from utils.core import PPOBuffer
 from ppo_worm.agent import PPOActorCritic
@@ -65,9 +65,6 @@ class PPO:
             self.model_path = model_path
             self.load_model(self.model_path)
         
-        if proc_id() == 0:
-            self.writer = SummaryWriter(log_dir=self.model_path)
-
     def compute_loss_pi(self, data):
         """Compute the loss of the actor policy.
 
@@ -143,10 +140,9 @@ class PPO:
     def train(self):
         """Run training across multiple environments using MPI.
         """
-        # Save parameters to YAML if the root process.
-
         comm = MPI.COMM_WORLD
 
+        # Save parameters to YAML if the root process.
         if proc_id() == 0:
             self.log_params()
 
@@ -229,33 +225,33 @@ class PPO:
             }
             episode_lengths = []
             episode_rewards = []
-            if hasattr(self, "writer"):
+
+            if proc_id() == 0:
                 self.log_summary(epoch, metrics)
-        
-            if proc_id() == 0 and ((epoch % self.save_freq == 0) or (epoch == self.epochs - 1)):
-                self.save_model()
+                if ((epoch % self.save_freq == 0) or (epoch == self.epochs - 1)):
+                    self.save_model()
             
     def log_params(self):
         """Log training parameters into the YAML file for later reference.
         """
-        os.makedirs(self.model_path, exist_ok=True)
         attributes = inspect.getmembers(self, lambda a: not(inspect.isroutine(a)) and type(a) in (int, str, float))
         config = [a for a in attributes if not(a[0].startswith("__") and a[0].endswith("__"))]
         config = dict(config)
         config["algorithm"] = "ppo"
-        with open(f"{self.model_path}/config.yaml", "w") as f:
-            f.write(yaml.dump(config))
+        for key, value in config.items():
+            mlflow.log_param(key, value)
 
     def log_summary(self, epoch, metrics):
         """Log metrics onto tensorboard.
         """
         for name, value in metrics.items():
-            self.writer.add_scalar(name, value, epoch)
+            mlflow.log_metric(name, value, epoch)
     
     def save_model(self):
         """Save model to the model directory.
         """
-        torch.save(self.ac.state_dict(), f"{self.model_path}/actor_critic")
+        mlflow.pytorch.log_model(self.ac, "model")
+
 
     def test_model(self, model_path, test_episodes):
         """Rollout the model on the environment for a fixed number of epsiodes.
@@ -282,14 +278,16 @@ class PPO:
 def main():
     model_path=None
     agent_file = "worms/worms.x86_64"
-    
     if model_path is None:
-        cpus = 2
+        cpus = 4
         mpi_fork(cpus)
-        # TODO: change back to false
         env_fn = lambda: WormGymWrapper(agent_file, no_graphics=True)
-        ppo = PPO(env_fn, PPOActorCritic)
-        ppo.train()
+        ppo = PPO(env_fn, PPOActorCritic, epochs=5)
+        if proc_id() == 0:
+            with mlflow.start_run() as run:
+                ppo.train()
+        else:
+            ppo.train()
     else:
         cpus = 1
         mpi_fork(cpus)

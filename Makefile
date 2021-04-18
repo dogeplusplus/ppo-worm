@@ -4,6 +4,10 @@ CURRENT_DIR = $(shell pwd)
 tensorboard:
 	tensorboard --logdir=experiments
 
+.PHONY: mlflow 
+mlflow:
+	mlflow ui
+
 .PHONY: test
 test:
 	pytest

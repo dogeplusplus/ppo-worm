@@ -5,3 +5,6 @@ gym-unity==0.24.1
 gym==0.18.0
 tqdm==4.60.0
 mpi4py==3.0.3
+torchvision==0.9.1
+torch==1.8.1
+mlflow==1.15.0
