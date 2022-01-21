@@ -13,7 +13,7 @@ class WormGymWrapper(gym.Env):
         self.env = self._create_env(env_file, time_scale, no_graphics)
         # Reset to get behavior names
         self.env.reset()
-        
+
         self.behavior_name = list(self.env.behavior_specs)[0]
         behavior_spec = self.env.behavior_specs[self.behavior_name]
         self.observation_space = ObservationSpec(640, None, None)
@@ -22,8 +22,8 @@ class WormGymWrapper(gym.Env):
     def _create_env(self, env_file, time_scale, no_graphics):
         channel = EngineConfigurationChannel()
         env = UnityEnvironment(
-            file_name=env_file, 
-            no_graphics=no_graphics, 
+            file_name=env_file,
+            no_graphics=no_graphics,
             side_channels=[channel],
             # See if setting a worker id allows me to spin up more agents
             worker_id=proc_id(),
@@ -38,13 +38,13 @@ class WormGymWrapper(gym.Env):
         decision_steps, terminal_steps = self.env.get_steps(self.behavior_name)
         observation, _ = self._decision_to_observation(decision_steps)
         return observation
-    
+
     def step(self, action):
         # Reshape to (10, 9) as needed for the wrapper
         action = action.reshape((10, 9))
         act = ActionTuple(action)
         self.env.set_actions(self.behavior_name, act)
-        
+
         self.env.step()
         decision_steps, terminal_steps = self.env.get_steps(self.behavior_name)
         observation, reward = self._decision_to_observation(decision_steps)
@@ -56,13 +56,11 @@ class WormGymWrapper(gym.Env):
         steps = len(decision_steps)
         observations = np.concatenate([decision_steps[i].obs for i in range(steps)], axis=1)[0]
 
-        # Take the reward as the mean. #TODO: try to understand this further
         rewards = np.mean([decision_steps[i].reward for i in range(steps)])
 
         return observations, rewards
 
     def render(self):
-        # self.env.render()
         pass
-    
+
 

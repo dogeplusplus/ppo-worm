@@ -1,21 +1,19 @@
-import os
-import yaml
+import sys
 import torch
 import inspect
 import datetime
 import numpy as np
-import torch.nn as nn
 import mlflow.pytorch
 
 from tqdm import tqdm
 from mpi4py import MPI
 from torch.optim import Adam
 
+sys.path.append(".")
 from utils.core import PPOBuffer
 from ppo_worm.agent import PPOActorCritic
 from ppo_worm.env_wrapper import WormGymWrapper
 from utils.mpi_tools import (
-    mpi_statistics_scalar,
     mpi_fork,
     mpi_avg,
     proc_id,
@@ -36,7 +34,7 @@ class PPO:
         self.epochs = epochs
         self.gamma = gamma
         self.clip_ratio = clip_ratio
-        
+
         self.pi_lr = pi_lr
         self.vf_lr = vf_lr
         self.train_pi_iters = train_pi_iters
@@ -64,7 +62,7 @@ class PPO:
             # Existing model
             self.model_path = model_path
             self.load_model(self.model_path)
-        
+
     def compute_loss_pi(self, data):
         """Compute the loss of the actor policy.
 
@@ -87,7 +85,7 @@ class PPO:
         clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
 
         pi_info = dict(kl=approx_kl, ent=ent, cf=clipfrac)
-    
+
         return loss_pi, pi_info
 
     def compute_loss_v(self, data):
@@ -136,7 +134,7 @@ class PPO:
 
         kl, ent, cf = pi_info["kl"], pi_info_old["ent"], pi_info["cf"]
         return pi_l_old, v_l_old, kl, ent, cf
-    
+
     def train(self):
         """Run training across multiple environments using MPI.
         """
@@ -150,12 +148,12 @@ class PPO:
         torch.manual_seed(seed)
         np.random.seed(seed)
         local_steps_per_epoch = int(self.steps_per_epoch / num_procs())
-        
+
         obs_dim = self.env.observation_space[0]
         act_dim = self.env.action_space[0]
         replay = PPOBuffer(obs_dim, act_dim, local_steps_per_epoch, self.gamma, self.lam)
         pbar = tqdm(range(self.epochs), ncols=100)
-    
+
         # Initial observation
         o, ep_ret, ep_len = self.env.reset(), 0, 0
 
@@ -167,7 +165,7 @@ class PPO:
                 a, v, logp = self.ac.step(torch.as_tensor(o, dtype=torch.float32))
 
                 next_o, r, d, _ = self.env.step(a)
-                ep_ret += r
+                ep_ret = r
                 ep_len += 1
 
                 replay.store(o, a, r, v, logp)
@@ -190,7 +188,7 @@ class PPO:
                     episode_rewards.append(ep_ret)
                     o, ep_ret, ep_len = self.env.reset(), 0, 0
 
-            
+
             # Gather epoch data from each process
             if proc_id() == 0:
                 # Receive rewards and episode lengths
@@ -230,7 +228,7 @@ class PPO:
                 self.log_summary(epoch, metrics)
                 if ((epoch % self.save_freq == 0) or (epoch == self.epochs - 1)):
                     self.save_model()
-            
+
     def log_params(self):
         """Log training parameters into the YAML file for later reference.
         """
@@ -246,7 +244,7 @@ class PPO:
         """
         for name, value in metrics.items():
             mlflow.log_metric(name, value, epoch)
-    
+
     def save_model(self):
         """Save model to the model directory.
         """
@@ -255,7 +253,7 @@ class PPO:
 
     def test_model(self, model_path, test_episodes):
         """Rollout the model on the environment for a fixed number of epsiodes.
-        
+
         Args:
             model_path (str): path to the model directory
             test_episodes (int): number of episodes to run
@@ -271,7 +269,7 @@ class PPO:
                 with torch.no_grad():
                     a = self.ac.act(torch.as_tensor(o, dtype=torch.float32))
                 o, r, d, _ = self.env.step(a)
-                ep_ret += r
+                ep_ret = r
                 ep_len += 1
 
 
