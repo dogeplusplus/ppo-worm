@@ -15,7 +15,6 @@ class WormGymWrapper(gym.Env):
         self.env.reset()
 
         self.behavior_name = list(self.env.behavior_specs)[0]
-        behavior_spec = self.env.behavior_specs[self.behavior_name]
         self.observation_space = ObservationSpec(640, None, None)
         self.action_space = ActionSpec(continuous_size=90, discrete_branches=())
 

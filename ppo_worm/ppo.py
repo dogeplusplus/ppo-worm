@@ -262,24 +262,25 @@ class PPO:
         self.ac = self.actor_fn(self.env.observation_space, self.env.action_space)
         self.ac.load_state_dict(torch.load(f"{model_path}/actor_critic"))
 
-        for j in range(test_episodes):
-            o, d, ep_ret, ep_len = self.env.reset(), False, 0, 0
+        for _ in range(test_episodes):
+            o, d, _, ep_len = self.env.reset(), False, 0, 0
             while not(d or (ep_len == self.max_ep_len)):
                 # Take deterministic actions at test time (noise_scale=0)
                 with torch.no_grad():
                     a = self.ac.act(torch.as_tensor(o, dtype=torch.float32))
-                o, r, d, _ = self.env.step(a)
-                ep_ret = r
+                o, _, d, _ = self.env.step(a)
                 ep_len += 1
 
 
 def main():
     model_path=None
-    agent_file = "worms/worms.x86_64"
+    agent_file = "worm/worm.x86_64"
     if model_path is None:
         cpus = 4
         mpi_fork(cpus)
-        env_fn = lambda: WormGymWrapper(agent_file, no_graphics=True)
+
+        no_graphics = True if proc_id() != 0 else False
+        env_fn = lambda: WormGymWrapper(agent_file, no_graphics)
         ppo = PPO(env_fn, PPOActorCritic, epochs=5)
         if proc_id() == 0:
             with mlflow.start_run() as run:
